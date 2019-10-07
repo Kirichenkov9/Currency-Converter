@@ -1,6 +1,8 @@
 package com.example.converter
 
+import android.content.Context
 import android.os.Bundle
+import android.support.v4.widget.SwipeRefreshLayout
 import android.support.v7.app.AppCompatActivity
 import android.util.Log
 import android.view.View
@@ -21,6 +23,7 @@ class MainActivity : AppCompatActivity() {
     private var valFromView: EditText? = null
     private var resultView: TextView? = null
     private var lineResult: LinearLayout? = null
+    private var swipeLayout: SwipeRefreshLayout? = null
 
     private var valueFrom: Float? = null
     private var result: String? = null
@@ -28,8 +31,8 @@ class MainActivity : AppCompatActivity() {
     private var currencyFrom: String? = null
     private var currencyTo: String? = null
 
-    private var arrayList = ArrayList<String>()
     private var arrayAdapter: ArrayAdapter<String>? = null
+    private var listOfCurrency: ArrayList<String>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,29 +44,24 @@ class MainActivity : AppCompatActivity() {
         valFromView = find(R.id.value_from)
         resultView = find(R.id.result_value)
         lineResult = find(R.id.line_result)
+        swipeLayout = find(R.id.swipe_fresh)
+
+        swipeLayout?.isRefreshing = false
 
         // сохраняем значения переменных при смене ориентации экрана
         if (savedInstanceState != null) {
             currencyFrom = savedInstanceState.getString("CURRENCY_FROM", null)
             currencyTo = savedInstanceState.getString("CURRENCY_TO", null)
-            valueFrom = savedInstanceState.getFloat("VALUE_FROM", 0F)
             result = savedInstanceState.getString("RESULT", null)
 
             resultView?.text = result
             lineResult?.visibility = View.VISIBLE
 
-            arrayList.addAll(savedInstanceState.getStringArrayList("ARRAY_CURRENCIES"))
+            val arrayList =
+                ArrayList<String>(savedInstanceState.getStringArrayList("ARRAY_CURRENCIES"))
 
-            arrayAdapter =
-                ArrayAdapter<String>(
-                    this@MainActivity,
-                    android.R.layout.simple_spinner_item,
-                    arrayList
-                )
-            arrayAdapter?.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+            initialize(this, arrayList)
 
-            spinnerFrom?.adapter = arrayAdapter
-            spinnerTo?.adapter = arrayAdapter
 
         } else
         // если переменная savedInstanceState == null получаем список валют через get запрос
@@ -118,10 +116,18 @@ class MainActivity : AppCompatActivity() {
                 focusView?.requestFocus()
             }
         }
+
+        swipeLayout?.setColorSchemeResources(android.R.color.holo_orange_light)
+        swipeLayout?.setOnRefreshListener {
+            swipeLayout?.isRefreshing = true
+            getCurrencies()
+        }
+
     }
 
     // функция для получения списка валют
-    private fun getCurrencies(): ArrayList<String> {
+    private fun getCurrencies() {
+        val arrayList = ArrayList<String>()
 
         val queue = Volley.newRequestQueue(this)
         val url: String = "https://free.currconv.com/api/v7/currencies?apiKey=1ca94974e1defb8bf62c/"
@@ -129,28 +135,24 @@ class MainActivity : AppCompatActivity() {
         val cacheRequest =
             CacheRequest(Request.Method.POST, url, Response.Listener<NetworkResponse> { response ->
 
-                val jsonStr = String(response.data, charset(HttpHeaderParser.parseCharset(response.headers)))
+                val jsonStr = String(
+                    response.data,
+                    charset(HttpHeaderParser.parseCharset(response.headers))
+                )
                 val jsonObj = JSONObject(jsonStr)
 
                 Log.d("JSON:", jsonObj.toString())
 
                 val json: JSONObject = jsonObj.getJSONObject("results")
 
-                for (i in json.keys()) arrayList.add(i.toString())
+                for (i in json.keys())
+                    arrayList.add(i.toString())
 
                 arrayList.sort()
 
-                arrayAdapter =
-                    ArrayAdapter<String>(
-                        this@MainActivity,
-                        android.R.layout.simple_spinner_item,
-                        arrayList
-                    )
-                arrayAdapter?.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                listOfCurrency = arrayList
 
-                spinnerFrom?.adapter = arrayAdapter
-                spinnerTo?.adapter = arrayAdapter
-
+                initialize(this, arrayList)
 
             },
                 Response.ErrorListener { error ->
@@ -161,8 +163,6 @@ class MainActivity : AppCompatActivity() {
                 })
 
         queue.add(cacheRequest)
-
-        return arrayList
     }
 
     // функиця для получения текущего курса и конвертирования валют
@@ -188,7 +188,6 @@ class MainActivity : AppCompatActivity() {
                 resultView?.text = result
                 lineResult?.visibility = View.VISIBLE
 
-
             }, Response.ErrorListener { error ->
                 if (error is NetworkError || error is NoConnectionError)
                     toast("Проверьте подключение к интернету!")
@@ -204,8 +203,37 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
         outState?.putString("CURRENCY_FROM", currencyFrom)
         outState?.putString("CURRENCY_TO", currencyTo)
-        outState?.putStringArrayList("ARRAY_CURRENCIES", arrayList)
-        valueFrom?.let { outState?.putFloat("VALUE_FROM", it) }
+        outState?.putStringArrayList("ARRAY_CURRENCIES", listOfCurrency)
         outState?.putString("RESULT", result)
     }
+
+    private fun initialize(context: Context, arrayList: ArrayList<String>) {
+        arrayAdapter =
+            ArrayAdapter<String>(
+                context,
+                android.R.layout.simple_spinner_item,
+                arrayList
+            )
+        arrayAdapter?.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+
+        spinnerFrom?.adapter = arrayAdapter
+        spinnerTo?.adapter = arrayAdapter
+
+        if (!currencyFrom.isNullOrEmpty()) {
+            val posFrom = arrayAdapter?.getPosition(currencyFrom)
+            posFrom?.let { spinnerFrom?.setSelection(it) }
+        }
+
+        if (!currencyTo.isNullOrEmpty()) {
+            val posFrom = arrayAdapter?.getPosition(currencyTo)
+            posFrom?.let { spinnerTo?.setSelection(it) }
+        }
+
+        swipeLayout?.isRefreshing = false
+    }
+
+    private fun setLastUpdateData() {
+
+    }
+
 }
