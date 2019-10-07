@@ -57,10 +57,10 @@ class MainActivity : AppCompatActivity() {
             resultView?.text = result
             lineResult?.visibility = View.VISIBLE
 
-            val arrayList =
+            listOfCurrency =
                 ArrayList<String>(savedInstanceState.getStringArrayList("ARRAY_CURRENCIES"))
 
-            initialize(this, arrayList)
+            initialize(this)
 
 
         } else
@@ -152,7 +152,7 @@ class MainActivity : AppCompatActivity() {
 
                 listOfCurrency = arrayList
 
-                initialize(this, arrayList)
+                initialize(this)
 
             },
                 Response.ErrorListener { error ->
@@ -207,12 +207,12 @@ class MainActivity : AppCompatActivity() {
         outState?.putString("RESULT", result)
     }
 
-    private fun initialize(context: Context, arrayList: ArrayList<String>) {
+    private fun initialize(context: Context) {
         arrayAdapter =
             ArrayAdapter<String>(
                 context,
                 android.R.layout.simple_spinner_item,
-                arrayList
+                listOfCurrency
             )
         arrayAdapter?.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
 
@@ -231,9 +231,4 @@ class MainActivity : AppCompatActivity() {
 
         swipeLayout?.isRefreshing = false
     }
-
-    private fun setLastUpdateData() {
-
-    }
-
 }
